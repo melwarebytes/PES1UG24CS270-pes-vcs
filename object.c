@@ -216,6 +216,22 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
 
     if (type_out) *type_out = type;
 
+    // Step 5: Integrity check — recompute hash of file contents and compare
+    ObjectID computed;
+    compute_hash(buf, file_len, &computed);
+    if (memcmp(computed.hash, id->hash, HASH_SIZE) != 0) { free(buf); return -1; }
+
+    // Step 6: Extract data portion (bytes after the '\0') and return to caller
+    uint8_t *data_start = nul + 1;
+    size_t actual_data_len = file_len - (size_t)(data_start - buf);
+
+    uint8_t *out = malloc(actual_data_len);
+    if (!out) { free(buf); return -1; }
+    memcpy(out, data_start, actual_data_len);
+
+    if (data_out) *data_out = out;
+    if (len_out)  *len_out  = actual_data_len;
+
     free(buf);
     return 0;
 }
