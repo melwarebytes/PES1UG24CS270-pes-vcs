@@ -156,8 +156,34 @@ static int write_tree_level(IndexEntry *entries, int count, int prefix_len, Obje
             e->name[sizeof(e->name) - 1] = '\0';
             i++;
         } else {
-            // This entry lives in a subdirectory — handled in Commit 4
-            i++;
+            // Entry is inside a subdirectory: collect all entries sharing this prefix
+            size_t dir_len = (size_t)(slash - rel);
+            char dir_name[256];
+            strncpy(dir_name, rel, dir_len);
+            dir_name[dir_len] = '\0';
+
+            // Find how many consecutive entries share this same subdirectory
+            int j = i;
+            while (j < count) {
+                const char *r = entries[j].path + prefix_len;
+                if (strncmp(r, dir_name, dir_len) != 0 || r[dir_len] != '/')
+                    break;
+                j++;
+            }
+
+            // Recurse into the subdirectory with the grouped slice
+            ObjectID sub_id;
+            if (write_tree_level(entries + i, j - i, prefix_len + (int)dir_len + 1, &sub_id) < 0)
+                return -1;
+
+            // Add a directory (tree) entry for this subdirectory
+            TreeEntry *e = &tree.entries[tree.count++];
+            e->mode = MODE_DIR;
+            e->hash = sub_id;
+            strncpy(e->name, dir_name, sizeof(e->name) - 1);
+            e->name[sizeof(e->name) - 1] = '\0';
+
+            i = j;
         }
     }
 
