@@ -190,7 +190,11 @@ int index_save(const Index *index) {
                 e->size, e->path);
     }
 
-    return 0; // fsync + rename in next commit
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+
+    return rename(tmp_path, INDEX_FILE);
 }
 
 // Stage a file for the next commit.
