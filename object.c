@@ -181,7 +181,41 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
 // The caller is responsible for calling free(*data_out).
 // Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+    // Step 1: Build path and open file
+    char path[512];
+    object_path(id, path, sizeof(path));
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    // Step 2: Read entire file into memory
+    fseek(f, 0, SEEK_END);
+    size_t file_len = (size_t)ftell(f);
+    rewind(f);
+
+    uint8_t *buf = malloc(file_len);
+    if (!buf) { fclose(f); return -1; }
+    if (fread(buf, 1, file_len, f) != file_len) { free(buf); fclose(f); return -1; }
+    fclose(f);
+
+    // Step 3: Parse header — find the '\0' separating header from data
+    uint8_t *nul = memchr(buf, '\0', file_len);
+    if (!nul) { free(buf); return -1; }
+
+    // Parse type string and size from header
+    char type_str[16];
+    size_t data_size;
+    if (sscanf((char *)buf, "%15s %zu", type_str, &data_size) != 2) { free(buf); return -1; }
+
+    // Step 4: Map type string to ObjectType enum
+    ObjectType type;
+    if      (strcmp(type_str, "blob")   == 0) type = OBJ_BLOB;
+    else if (strcmp(type_str, "tree")   == 0) type = OBJ_TREE;
+    else if (strcmp(type_str, "commit") == 0) type = OBJ_COMMIT;
+    else { free(buf); return -1; }
+
+    if (type_out) *type_out = type;
+
+    free(buf);
+    return 0;
 }
