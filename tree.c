@@ -135,6 +135,31 @@ static int compare_index_entries(const void *a, const void *b) {
     return strcmp(((const IndexEntry *)a)->path, ((const IndexEntry *)b)->path);
 }
 
+// Recursively build a tree object for entries[0..count-1].
+// prefix_len: number of leading bytes already consumed (the current directory prefix).
+// Writes the resulting tree object to the store and returns its hash in *id_out.
+static int write_tree_level(IndexEntry *entries, int count, int prefix_len, ObjectID *id_out) {
+    Tree tree;
+    tree.count = 0;
+
+    int i = 0;
+    while (i < count) {
+        const char *rel = entries[i].path + prefix_len; // path relative to current dir
+        const char *slash = strchr(rel, '/');
+
+        if (!slash) {
+            // This entry is a plain file in the current directory — handled in Commit 3
+            i++;
+        } else {
+            // This entry lives in a subdirectory — handled in Commit 4
+            i++;
+        }
+    }
+
+    (void)id_out;
+    return -1;
+}
+
 int tree_from_index(ObjectID *id_out) {
     Index index;
     if (index_load(&index) < 0) return -1;
