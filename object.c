@@ -116,6 +116,17 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     free(full);
 
     if (id_out) *id_out = id;
+
+    // Deduplication: object already stored, nothing to do
+    if (object_exists(&id)) return 0;
+
+    // Create shard directory .pes/objects/XX/ (ignore EEXIST)
+    char hex[HASH_HEX_SIZE + 1];
+    hash_to_hex(&id, hex);
+    char shard_dir[128];
+    snprintf(shard_dir, sizeof(shard_dir), "%s/%.2s", OBJECTS_DIR, hex);
+    mkdir(shard_dir, 0755);
+
     return 0;
 }
 
