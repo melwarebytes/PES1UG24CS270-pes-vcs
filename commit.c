@@ -198,6 +198,13 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     Commit c;
     if (tree_from_index(&c.tree) != 0) return -1;
 
+    // Step 2: Read parent commit from HEAD (absent on first commit)
+    if (head_read(&c.parent) == 0) {
+        c.has_parent = 1;
+    } else {
+        c.has_parent = 0;
+    }
+
     (void)message; (void)commit_id_out;
     return -1;
 }
