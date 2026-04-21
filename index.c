@@ -229,5 +229,25 @@ int index_add(Index *index, const char *path) {
     free(buf);
     if (rc < 0) return -1;
 
-    return 0; // metadata + index update in next commit
+    // Get file metadata (mode, mtime, size)
+    struct stat st;
+    if (stat(path, &st) != 0) return -1;
+
+    uint32_t mode = (st.st_mode & S_IXUSR) ? 0100755 : 0100644;
+
+    // Update existing entry or append a new one
+    IndexEntry *e = index_find(index, path);
+    if (!e) {
+        if (index->count >= MAX_INDEX_ENTRIES) return -1;
+        e = &index->entries[index->count++];
+    }
+
+    e->mode      = mode;
+    e->hash      = blob_id;
+    e->mtime_sec = (uint64_t)st.st_mtime;
+    e->size      = (uint32_t)st.st_size;
+    strncpy(e->path, path, sizeof(e->path) - 1);
+    e->path[sizeof(e->path) - 1] = '\0';
+
+    return index_save(index);
 }
