@@ -127,6 +127,34 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     snprintf(shard_dir, sizeof(shard_dir), "%s/%.2s", OBJECTS_DIR, hex);
     mkdir(shard_dir, 0755);
 
+    // Write to temp file in the shard dir, then atomically rename to final path
+    char tmp_path[512];
+    snprintf(tmp_path, sizeof(tmp_path), "%s/tmp_XXXXXX", shard_dir);
+    int fd = mkstemp(tmp_path);
+    if (fd < 0) return -1;
+
+    // Rebuild full object buffer for writing
+    uint8_t *obj = malloc(full_len);
+    if (!obj) { close(fd); return -1; }
+    memcpy(obj, header, header_len);
+    memcpy(obj + header_len, data, len);
+
+    if (write(fd, obj, full_len) != (ssize_t)full_len) {
+        free(obj); close(fd); return -1;
+    }
+    free(obj);
+    fsync(fd);
+    close(fd);
+
+    // Atomically move temp file to final object path
+    char final_path[512];
+    object_path(&id, final_path, sizeof(final_path));
+    if (rename(tmp_path, final_path) < 0) return -1;
+
+    // fsync the shard directory to persist the rename
+    int dir_fd = open(shard_dir, O_RDONLY);
+    if (dir_fd >= 0) { fsync(dir_fd); close(dir_fd); }
+
     return 0;
 }
 
