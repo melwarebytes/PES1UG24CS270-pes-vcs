@@ -187,8 +187,14 @@ static int write_tree_level(IndexEntry *entries, int count, int prefix_len, Obje
         }
     }
 
-    (void)id_out;
-    return -1;
+    // Serialize the tree and write it to the object store
+    void *data;
+    size_t data_len;
+    if (tree_serialize(&tree, &data, &data_len) < 0) return -1;
+
+    int ret = object_write(OBJ_TREE, data, data_len, id_out);
+    free(data);
+    return ret;
 }
 
 int tree_from_index(ObjectID *id_out) {
@@ -198,6 +204,5 @@ int tree_from_index(ObjectID *id_out) {
     // Sort entries by path so subdirectory grouping works correctly
     qsort(index.entries, index.count, sizeof(IndexEntry), compare_index_entries);
 
-    (void)id_out;
-    return -1;
+    return write_tree_level(index.entries, index.count, 0, id_out);
 }
