@@ -148,7 +148,12 @@ static int write_tree_level(IndexEntry *entries, int count, int prefix_len, Obje
         const char *slash = strchr(rel, '/');
 
         if (!slash) {
-            // This entry is a plain file in the current directory — handled in Commit 3
+            // Plain file in this directory: add a blob entry directly
+            TreeEntry *e = &tree.entries[tree.count++];
+            e->mode = entries[i].mode;
+            e->hash = entries[i].hash;
+            strncpy(e->name, rel, sizeof(e->name) - 1);
+            e->name[sizeof(e->name) - 1] = '\0';
             i++;
         } else {
             // This entry lives in a subdirectory — handled in Commit 4
